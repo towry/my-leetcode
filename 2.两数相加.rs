@@ -26,10 +26,16 @@ fn append_num(origin: i32, next: i32) -> i32 {
 }
 
 fn num_of_list(list: &Option<Box<ListNode>>) -> i32 {
-    let mut val = list.unwrap().val;
+    let mut val = 0;
+    let mut node: &Option<Box<ListNode>> = list;
 
-    while let Some(node) = list.unwrap().next {
-        val = append_num(val, node.val);
+    while let Some(next) = &node.as_ref().unwrap().next {
+        val = append_num(val, next.val);
+
+        match node {
+            None => (),
+            Some(n) => node = &n.next,
+        }
     }
 
     val
@@ -51,17 +57,21 @@ impl Solution {
         let result = l1n + l2n;
         let list = num_to_vec_in_revert(result);
         
-        let mut root: Option<Box<ListNode>> = Some(Box::new(ListNode::new(list[0])));
-        let mut node: Option<Box<ListNode>> = None;
-        root.next = node;
+        let mut root: Box<ListNode> = Box::new(ListNode::new(list[0]));
+        let mut node: &mut Option<Box<ListNode>> = &mut root.next;
+
+        let mut new_node;
 
         for n in list.iter().skip(1) {
-            let new_node = Some(Box::new(ListNode::new(n)));
-            node.next = new_node;
-            node = new_node;
+            new_node = Some(Box::new(ListNode::new(*n)));
+            match node {
+                Some(ref mut n) => n.next = new_node,
+                None => (),
+            }
+            node = &mut new_node;
         }
 
-        root
+        Some(root)
     }
 }
 // @lc code=end
