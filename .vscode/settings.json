@@ -1,0 +1,10 @@
+{
+  "leetcode.endpoint": "leetcode-cn",
+  "leetcode.hint.configWebviewMarkdown": false,
+  "leetcode.workspaceFolder": "/Users/towry/.leetcode/src/problems",
+  "leetcode.showDescription": "Both",
+  "leetcode.defaultLanguage": "rust",
+  "leetcode.useEndpointTranslation": false,
+  "leetcode.hint.commentDescription": false,
+  "leetcode.hint.commandShortcut": false
+}
