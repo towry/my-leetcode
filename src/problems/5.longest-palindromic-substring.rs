@@ -48,50 +48,39 @@ impl Solution {
         return s.chars().take(half).eq(s.chars().rev().take(half));
     }
     pub fn longest_palindrome(s: String) -> String {
-        let mut current_max_len: usize = 0;
-        let mut left_cursor: usize = 0;
-        let mut right_cursor: usize = s.len();
-        while left_cursor != right_cursor {
-            if s.get(left_cursor..right_cursor)
-                .map_or(false, |s| Solution::is_palindrome(s))
-            {
-                let len = right_cursor - left_cursor;
-                current_max_len = if len > current_max_len {
-                    len
-                } else {
-                    current_max_len
-                };
-                break;
-            }
-            left_cursor += 1;
-            right_cursor -= 1;
+        let len = s.len();
+
+        let mut window_size = len;
+        let mut left_cursor = 0;
+        let mut right_cursor = left_cursor + window_size;
+
+        if s.get(left_cursor..right_cursor)
+            .map_or(false, |s| Solution::is_palindrome(s))
+        {
+            return s.get(left_cursor..right_cursor).unwrap().to_owned();
         }
 
-        left_cursor = 0;
-        right_cursor = s.len() - 1;
-        while left_cursor != right_cursor && right_cursor + 1 - left_cursor > current_max_len {
-            if s.get(left_cursor..right_cursor)
-                .map_or(false, |s| Solution::is_palindrome(s))
-            {
-                current_max_len = right_cursor - left_cursor;
-                break;
+        window_size -= 1;
+        right_cursor = left_cursor + window_size;
+
+        while window_size > 1 {
+            // println!("{}, {}", left_cursor, window_size);
+            while left_cursor + window_size <= len {
+                // println!("{:?}", s.get(left_cursor..));
+                if s.get(left_cursor..right_cursor)
+                    .map_or(false, |s| Solution::is_palindrome(s))
+                {
+                    return s.get(left_cursor..right_cursor).unwrap().to_owned();
+                }
+                left_cursor += 1;
+                right_cursor = left_cursor + window_size;
             }
-            left_cursor += 1;
+            window_size -= 1;
+            left_cursor = 0;
+            right_cursor = left_cursor + window_size;
         }
 
-        left_cursor = 0;
-        right_cursor = s.len();
-        while left_cursor != right_cursor && right_cursor + 1 - left_cursor > current_max_len {
-            if s.get(left_cursor..right_cursor)
-                .map_or(false, |s| Solution::is_palindrome(s))
-            {
-                current_max_len = right_cursor - left_cursor;
-                break;
-            }
-            right_cursor -= 1;
-        }
-
-        current_max_len
+        s.get(0..1).map_or(String::from(""), |s| s.to_owned())
     }
 }
 // @lc code=end
