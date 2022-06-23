@@ -17,9 +17,9 @@
  * of rows like this: (you may want to display this pattern in a fixed font for
  * better legibility)
  *
- * 1 . 5 .  9  . 13  . 17
- * 2 4 6 8 10 12 14 16 18
- * 3   7   11    15  . 19
+ * 1 . 5 .  9  . 13
+ * 2 4 6 8 10 12 14
+ * 3   7   11
  *
  * P   A   H   N
  * A P L S I I G
