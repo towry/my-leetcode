@@ -191,3 +191,14 @@ impl Solution {
     }
 }
 // @lc code=end
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn test_get_column_size() {
+        let len = 14;
+        let num_of_rows = 4;
+        let colsize = Solution::get_column_size(num_of_rows, len);
+        assert_eq!(colsize, 7);
+    }
+}
