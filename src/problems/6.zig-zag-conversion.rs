@@ -87,29 +87,46 @@
 6 8
 7
 */
+#![deny(arithmetic_overflow)]
 
 // @lc code=start
 impl Solution {
     fn get_column_size(num_rows: usize, len: usize) -> usize {
-        let mut value = len;
+        let mut mut_len = len;
         let mut count: usize = 0;
-        while value >= num_rows {
+        let step = if num_rows <= 1 { 1 } else { 2 };
+        while mut_len >= step {
             count += 1;
-            value -= 2;
+            mut_len -= step;
+            if mut_len <= 0 {
+                return count;
+            }
         }
 
         count + 1
     }
 
     pub fn convert(s: String, num_rows: i32) -> String {
-        let middle_size: usize = num_rows as usize - 2;
+        let middle_size: usize = if num_rows > 2 {
+            num_rows as usize - 2
+        } else {
+            0
+        };
+        if s.len() <= 0 {
+            return s;
+        }
         let col_size = Solution::get_column_size(num_rows as usize, s.len());
         let chars = s.chars().collect::<Vec<_>>();
         let mut result: Vec<char> = Vec::with_capacity(chars.len());
 
-        println!("{}", col_size);
+        if col_size == 0 {
+            return s;
+        }
+
+        // println!("{}", col_size);
 
         let mut current_middle_size = middle_size;
+        let step = if middle_size == 0 { 1 } else { 2 };
 
         for r in 0..num_rows as usize {
             let mut col_index: usize = 0;
@@ -118,27 +135,33 @@ impl Solution {
 
             while col_index < col_size {
                 // col by col
-                let mut char_index = start_value + 2 * col_index;
+                let mut char_index = start_value + step * col_index;
 
                 if chars.get(char_index).is_none() {
-                    continue;
+                    col_index += 1;
+                    break;
                 } else {
                     result.push(*chars.get(char_index).unwrap());
                 }
 
-                println!(
-                    "{},{},{},{}",
-                    col_index,
-                    char_index,
-                    start_value,
-                    chars.get(char_index).unwrap_or(&'-')
-                );
+                // println!(
+                //     "{},{},{},{}",
+                //     col_index,
+                //     char_index,
+                //     start_value,
+                //     chars.get(char_index).unwrap_or(&'-')
+                // );
 
                 col_index += 1;
 
+                if current_middle_size == 0 && middle_size == 0 {
+                    // no middle size, just step by step.
+                    continue;
+                }
+
                 // num in middle.
                 let mid_col_index = col_index + current_middle_size;
-                char_index = start_value + 2 * mid_col_index;
+                char_index = start_value + step * mid_col_index;
                 col_index += middle_size;
                 if current_middle_size >= middle_size {
                     // skip.
@@ -147,14 +170,14 @@ impl Solution {
                 if chars.get(char_index).is_some() {
                     result.push(*chars.get(char_index).unwrap());
                 }
-                println!(
-                    "-- {},{},{},{}, {}",
-                    col_index,
-                    char_index,
-                    start_value,
-                    current_middle_size,
-                    chars.get(char_index).unwrap_or(&'-')
-                );
+                // println!(
+                //     "-- {},{},{},{}, {}",
+                //     col_index,
+                //     char_index,
+                //     start_value,
+                //     current_middle_size,
+                //     chars.get(char_index).unwrap_or(&'-')
+                // );
             }
 
             if current_middle_size <= 0 {
