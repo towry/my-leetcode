@@ -89,9 +89,11 @@
 */
 #![deny(arithmetic_overflow)]
 
+pub struct Solution;
+
 // @lc code=start
 impl Solution {
-    fn get_column_size(num_rows: usize, len: usize) -> usize {
+    pub fn get_column_size(num_rows: usize, len: usize) -> usize {
         let mut mut_len = len;
         let mut count: usize = 0;
         let step = if num_rows <= 1 { 1 } else { 2 };
@@ -194,11 +196,10 @@ impl Solution {
 
 #[cfg(test)]
 mod tests {
+    use super::Solution;
     #[test]
     fn test_get_column_size() {
-        let len = 14;
-        let num_of_rows = 4;
-        let colsize = Solution::get_column_size(num_of_rows, len);
+        let colsize = Solution::get_column_size(4, 14);
         assert_eq!(colsize, 7);
     }
 }
