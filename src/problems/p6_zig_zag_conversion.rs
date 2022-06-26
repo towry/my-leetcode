@@ -94,18 +94,34 @@ pub struct Solution;
 // @lc code=start
 impl Solution {
     pub fn get_column_size(num_rows: usize, len: usize) -> usize {
-        let mut mut_len = len;
-        let mut count: usize = 0;
-        let step = if num_rows <= 1 { 1 } else { 2 };
-        while mut_len >= step {
-            count += 1;
-            mut_len -= step;
-            if mut_len <= 0 {
-                return count;
+        let middle_size: usize = if num_rows > 2 {
+            num_rows as usize - 2
+        } else {
+            0
+        };
+
+        let mut count = 0;
+        let mut col = 0;
+        while count <= len {
+            for _ in 0..num_rows {
+                count += 1;
+            }
+            col += 1;
+
+            if count >= len {
+                return col;
+            }
+
+            for _ in 0..middle_size {
+                if count >= len {
+                    return col;
+                }
+                count += 1;
+                col += 1;
             }
         }
 
-        count + 1
+        col
     }
 
     pub fn convert(s: String, num_rows: i32) -> String {
@@ -125,10 +141,8 @@ impl Solution {
             return s;
         }
 
-        // println!("{}", col_size);
-
         let mut current_middle_size = middle_size;
-        let step = if middle_size == 0 { 1 } else { 2 };
+        let step = if num_rows == 1 { 1 } else { 2 };
 
         for r in 0..num_rows as usize {
             let mut col_index: usize = 0;
@@ -199,7 +213,8 @@ mod tests {
     use super::Solution;
     #[test]
     fn test_get_column_size() {
-        let colsize = Solution::get_column_size(4, 14);
-        assert_eq!(colsize, 7);
+        assert_eq!(Solution::get_column_size(2, 3), 2);
+        assert_eq!(Solution::get_column_size(1, 14), 14);
+        assert_eq!(Solution::get_column_size(5, 14), 6);
     }
 }
