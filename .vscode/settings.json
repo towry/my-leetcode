@@ -6,5 +6,12 @@
   "leetcode.defaultLanguage": "rust",
   "leetcode.useEndpointTranslation": false,
   "leetcode.hint.commentDescription": false,
-  "leetcode.hint.commandShortcut": false
+  "leetcode.hint.commandShortcut": false,
+  "leetcode.editor.shortcuts": ["submit", "test", "description"],
+  "leetcode.filePath": {
+    "default": {
+      "folder": "",
+      "filename": "p${id}_${snake_case_name}.${ext}"
+    }
+  }
 }
