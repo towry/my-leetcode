@@ -86,7 +86,7 @@ impl Solution {
         for s in ss {
             let mut found = false;
 
-            while p_index < pp.len() || !found {
+            while p_index < pp.len() && !found {
                 let pc = pp.get(p_index).unwrap();
                 if *pc == '.' {
                     precedant_type = PrecedantType::ALL_CHAR;
@@ -94,30 +94,24 @@ impl Solution {
                 }
                 if Solution::is_char_equal(&s, pc) {
                     p_index += 1;
-                    precedant = None;
+                    precedant = Some(s);
                     found = true;
+                    break;
                 } else if *pc == '*' {
                     if precedant.is_some()
                         && Solution::is_char_equal(&s, precedant.as_ref().unwrap())
                     {
                         found = true;
+                    } else {
+                        precedant = None;
+                        p_index += 1;
                     }
-                    precedant = None;
-                    continue;
-                } else if precedant.is_none() {
-                    p_index += 1;
-                } else if precedant.is_some() {
-                    break;
                 }
             }
 
             if !found {
-                p_index = 0;
+                return false;
             }
-        }
-
-        if precedant.is_some() {
-            return false;
         }
 
         true
@@ -129,12 +123,30 @@ impl Solution {
 mod tests {
     use super::Solution;
     #[test]
-    fn test_is_match() {
+    fn test_is_match_1() {
         assert_eq!(Solution::is_match("abc".to_owned(), "a*".to_owned()), false);
-        assert_eq!(Solution::is_match("abc".to_owned(), "a.*".to_owned()), true);
+    }
+    #[test]
+    fn test_is_match_2() {
+        assert_eq!(
+            Solution::is_match("abc".to_owned(), "a.*".to_owned()),
+            false
+        );
+    }
+    #[test]
+    fn test_is_match_3() {
         assert_eq!(Solution::is_match("abc".to_owned(), ".*".to_owned()), true);
+    }
+    #[test]
+    fn test_is_match_4() {
         assert_eq!(Solution::is_match("aa".to_owned(), "a".to_owned()), false);
+    }
+    #[test]
+    fn test_is_match_5() {
         assert_eq!(Solution::is_match("aa".to_owned(), "aa".to_owned()), true);
+    }
+    #[test]
+    fn test_is_match_6() {
         assert_eq!(
             Solution::is_match("aab".to_owned(), "c*a*b".to_owned()),
             true
