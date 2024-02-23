@@ -66,55 +66,114 @@
 struct Solution;
 
 // @lc code=start
-pub enum PrecedantType {
+#[derive(Debug)]
+pub enum Precedant {
     None,
-    ALL_CHAR,
+    Char(char),
+    DotChar,
 }
 
-impl Solution {
-    fn is_char_equal<'a>(a: &'a char, p: &'a char) -> bool {
-        a == p || *p == '.'
+#[derive(Debug)]
+struct MyRegex {
+    pattern: Vec<char>,
+    pindex: u32,
+    sindex: u32,
+    precedant: Precedant,
+}
+
+const DOT_CHAR: char = '.';
+const MANY_CHAR: char = '*';
+
+impl MyRegex {
+    fn is_special_char(&self, c: &char) -> bool {
+        *c == DOT_CHAR || *c == MANY_CHAR
     }
+    fn is_match(&mut self, s: String) -> bool {
+        let chars = s.chars().collect::<Vec<char>>();
 
-    pub fn is_match(s: String, p: String) -> bool {
-        let ss: std::str::Chars = s.chars();
-        let pp = p.chars().collect::<Vec<_>>();
-        let mut p_index: usize = 0;
-        let mut precedant: Option<char> = None;
-        let mut precedant_type = PrecedantType::None;
-
-        for s in ss {
-            let mut found = false;
-
-            while p_index < pp.len() && !found {
-                let pc = pp.get(p_index).unwrap();
-                if *pc == '.' {
-                    precedant_type = PrecedantType::ALL_CHAR;
-                    precedant = None;
-                }
-                if Solution::is_char_equal(&s, pc) {
-                    p_index += 1;
-                    precedant = Some(s);
-                    found = true;
-                    break;
-                } else if *pc == '*' {
-                    if precedant.is_some()
-                        && Solution::is_char_equal(&s, precedant.as_ref().unwrap())
-                    {
-                        found = true;
-                    } else {
-                        precedant = None;
-                        p_index += 1;
-                    }
-                }
-            }
-
-            if !found {
+        loop {
+           let ch = self.pattern.get(self.pindex as usize);
+           if ch.is_none() {
+                break;
+           }
+           let p: &char = ch.unwrap();
+           let sh = chars.get(self.sindex as usize);
+           if sh.is_none() {
+            if *p != MANY_CHAR {
                 return false;
             }
+            self.pindex = self.pindex + 1;
+            if self.pattern.len() > self.pindex as usize {
+                self.sindex = self.sindex - 1;
+            }
+            continue;
+           }
+           let s: &char = sh.unwrap();
+
+           if !self.is_special_char(p) && *p == *s  {
+            self.pindex = self.pindex + 1;
+            self.sindex = self.sindex + 1;
+            self.precedant = Precedant::Char(*p);
+            continue;
+           } else if !self.is_special_char(p) {
+               if !matches!(self.precedant, Precedant::None) {
+                    return false;
+               }
+               self.pindex = self.pindex + 1;
+               self.precedant = Precedant::Char(*p);
+           }
+
+           if *p == DOT_CHAR {
+            self.pindex = self.pindex +1;
+            self.sindex = self.sindex + 1;
+            self.precedant = Precedant::DotChar;
+            continue;
+           }
+
+           if *p == MANY_CHAR {
+            match self.precedant {
+                Precedant::Char(ch) => {
+                    // match 0 or multiple times
+                    if ch == *s {
+                        self.sindex = self.sindex + 1;
+                    } else {
+                        // no match, MANY_CHAR is invalid. 0 time.
+                        self.pindex = self.pindex + 1;
+                        self.precedant = Precedant::None;
+                    }
+                }
+                Precedant::DotChar => {
+                    self.sindex = self.sindex + 1;
+                }
+                _ => {
+                    continue;
+                }
+            }
+           }
+        }
+        // check char left
+        if self.pattern.len() - self.pindex as usize > 1 {
+            return false;
+        }
+        let ch = chars.get(self.sindex as usize);
+        if ch.is_some() {
+            return false;
         }
 
         true
+    }
+}
+
+impl Solution {
+    pub fn is_match(s: String, p: String) -> bool {
+        let mut reg = MyRegex {
+            pattern: p.chars().collect::<Vec<char>>(),
+            pindex: 0,
+            sindex: 0,
+            precedant: Precedant::None,
+        };
+
+        reg.is_match(s)
     }
 }
 // @lc code=end
@@ -130,7 +189,7 @@ mod tests {
     fn test_is_match_2() {
         assert_eq!(
             Solution::is_match("abc".to_owned(), "a.*".to_owned()),
-            false
+            true
         );
     }
     #[test]
@@ -149,6 +208,30 @@ mod tests {
     fn test_is_match_6() {
         assert_eq!(
             Solution::is_match("aab".to_owned(), "c*a*b".to_owned()),
+            true
+        );
+    }
+
+    #[test]
+    fn test_is_match_7() {
+        assert_eq!(
+            Solution::is_match("aaa".to_owned(), "aaaa".to_owned()),
+            false
+        );
+    }
+
+    #[test]
+    fn test_is_match_8() {
+        assert_eq!(
+            Solution::is_match("aaa".to_owned(), "a*a".to_owned()),
+            true
+        );
+    }
+    
+    #[test]
+    fn test_is_match_9() {
+        assert_eq!(
+            Solution::is_match("aaa".to_owned(), "ab*ac*a".to_owned()),
             true
         );
     }
