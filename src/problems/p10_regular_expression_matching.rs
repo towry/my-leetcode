@@ -62,6 +62,9 @@
  *
  *
  */
+#![allow(clippy::needless_return)]
+
+use std::cmp::{Eq, PartialEq};
 
 struct Solution;
 
@@ -76,9 +79,17 @@ pub enum Precedant {
 #[derive(Debug)]
 struct MyRegex {
     pattern: Vec<char>,
-    pindex: u32,
-    sindex: u32,
+    pindex: usize,
+    sindex: usize,
     precedant: Precedant,
+}
+
+struct MatchingGroup<'a>(&'a str);
+
+impl<'a> PartialEq<&str> for MatchingGroup<'a> {
+    fn eq(&self, rhs: &&str) -> bool {
+        return self.0 == *rhs;
+    }
 }
 
 const DOT_CHAR: char = '.';
@@ -88,79 +99,85 @@ impl MyRegex {
     fn is_special_char(&self, c: &char) -> bool {
         *c == DOT_CHAR || *c == MANY_CHAR
     }
-    fn is_match(&mut self, s: String) -> bool {
-        let chars = s.chars().collect::<Vec<char>>();
 
-        loop {
-           let ch = self.pattern.get(self.pindex as usize);
-           if ch.is_none() {
-                break;
-           }
-           let p: &char = ch.unwrap();
-           let sh = chars.get(self.sindex as usize);
-           if sh.is_none() {
-            if *p != MANY_CHAR {
-                return false;
-            }
-            self.pindex = self.pindex + 1;
-            if self.pattern.len() > self.pindex as usize {
-                self.sindex = self.sindex - 1;
-            }
-            continue;
-           }
-           let s: &char = sh.unwrap();
+    fn match_on_dot(&self) {}
+    fn match_on_many(&self) {}
 
-           if !self.is_special_char(p) && *p == *s  {
-            self.pindex = self.pindex + 1;
-            self.sindex = self.sindex + 1;
+    fn match_on_char(&mut self, s: &char, p: &char) -> bool {
+        if !self.is_special_char(p) && *p == *s {
+            self.pindex += 1;
+            self.sindex += 1;
+            self.precedant = Precedant::None;
+            return false;
+        } else if !self.is_special_char(p) {
+            self.pindex += 1;
             self.precedant = Precedant::Char(*p);
-            continue;
-           } else if !self.is_special_char(p) {
-               if !matches!(self.precedant, Precedant::None) {
-                    return false;
-               }
-               self.pindex = self.pindex + 1;
-               self.precedant = Precedant::Char(*p);
-           }
+            return false;
+        }
 
-           if *p == DOT_CHAR {
-            self.pindex = self.pindex +1;
-            self.sindex = self.sindex + 1;
+        if *p == DOT_CHAR {
+            if matches!(self.precedant, Precedant::Char(_)) {
+                return true;
+            }
+            self.pindex += 1;
+            self.sindex += 1;
             self.precedant = Precedant::DotChar;
-            continue;
-           }
+            return false;
+        }
 
-           if *p == MANY_CHAR {
+        if *p == MANY_CHAR {
             match self.precedant {
                 Precedant::Char(ch) => {
                     // match 0 or multiple times
                     if ch == *s {
-                        self.sindex = self.sindex + 1;
+                        self.sindex += 1;
                     } else {
                         // no match, MANY_CHAR is invalid. 0 time.
-                        self.pindex = self.pindex + 1;
+                        self.pindex += 1;
                         self.precedant = Precedant::None;
                     }
                 }
                 Precedant::DotChar => {
-                    self.sindex = self.sindex + 1;
+                    self.sindex += 1;
                 }
                 _ => {
-                    continue;
+                    self.pindex += 1;
                 }
             }
-           }
         }
-        // check char left
-        if self.pattern.len() - self.pindex as usize > 1 {
-            return false;
-        }
-        let ch = chars.get(self.sindex as usize);
-        if ch.is_some() {
-            return false;
+        return false;
+    }
+
+    fn is_match(&mut self, s: String) -> bool {
+        let chars = s.chars().collect::<Vec<char>>();
+
+        loop {
+            let ch = self.pattern.get(self.pindex).cloned();
+            let sh = chars.get(self.sindex);
+
+            if ch.is_none() {
+                if sh.is_none() {
+                    return true;
+                }
+                return false;
+            }
+            let p: char = ch.unwrap();
+            if sh.is_none() {
+                break;
+            }
+            let s: &char = sh.unwrap();
+
+            if self.match_on_char(s, &p) {
+                return false;
+            }
         }
 
-        true
+        let sh = chars.get(self.sindex - 1);
+        if sh.is_none() {
+            return true;
+        }
+        let s = sh.unwrap();
+        return false;
     }
 }
 
@@ -187,10 +204,7 @@ mod tests {
     }
     #[test]
     fn test_is_match_2() {
-        assert_eq!(
-            Solution::is_match("abc".to_owned(), "a.*".to_owned()),
-            true
-        );
+        assert_eq!(Solution::is_match("abc".to_owned(), "a.*".to_owned()), true);
     }
     #[test]
     fn test_is_match_3() {
@@ -222,12 +236,9 @@ mod tests {
 
     #[test]
     fn test_is_match_8() {
-        assert_eq!(
-            Solution::is_match("aaa".to_owned(), "a*a".to_owned()),
-            true
-        );
+        assert_eq!(Solution::is_match("aaa".to_owned(), "a*a".to_owned()), true);
     }
-    
+
     #[test]
     fn test_is_match_9() {
         assert_eq!(
