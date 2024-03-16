@@ -86,8 +86,8 @@ const MANY_CHAR: char = '*';
 #[derive(Debug)]
 struct MyRegex {
     pattern: Vec<char>,
-    pindex: usize,
     sindex: usize,
+    is_match_many: bool,
     matching_patterns: Vec<MatchingPattern>,
 }
 
@@ -95,10 +95,17 @@ impl MyRegex {
     fn new(pattern: Vec<char>) -> Self {
         MyRegex {
             pattern,
-            pindex: 0,
             sindex: 0,
+            is_match_many: false,
             matching_patterns: vec![],
         }
+    }
+}
+
+fn matching_chars(host: &MyRegex, chars: &Vec<char>, parts: &Vec<char>) {
+    let parts_len = parts.len();
+    loop {
+        let mirror = &chars[host.sindex..parts_len];
     }
 }
 
@@ -127,7 +134,7 @@ impl MyRegex {
                     self.matching_patterns.push(MatchingPattern::ManyRepeat);
                 } else if pre_char != ' ' {
                     group.pop();
-                    if group.len() > 0 {
+                    if !group.is_empty() {
                         self.matching_patterns.push(MatchingPattern::Chars(group));
                         group = vec![];
                     }
@@ -137,7 +144,7 @@ impl MyRegex {
                 continue;
             } else if *s == '.' {
                 pre_char = '.';
-                if group.len() > 0 {
+                if !group.is_empty() {
                     self.matching_patterns.push(MatchingPattern::Chars(group));
                     group = vec![];
                 }
@@ -149,56 +156,8 @@ impl MyRegex {
             group.push(pre_char);
         }
 
-        if group.len() > 0 {
+        if !group.is_empty() {
             self.matching_patterns.push(MatchingPattern::Chars(group));
-        }
-    }
-
-    fn match_on_dot(&self) {}
-    fn match_on_many(&self) {}
-
-    fn peek_next_pairs_pattern_char(&self) -> (Option<char>, Option<char>) {
-        (
-            self.pattern.get(self.pindex).cloned(),
-            self.pattern.get(self.pindex + 1).cloned(),
-        )
-    }
-
-    fn next_matching_pattern(&self) -> MatchingPattern {
-        match self.peek_next_pairs_pattern_char() {
-            (Some(a), Some(b)) => {
-                if !self.is_special_char(&a) && !self.is_special_char(&b) {
-                    return MatchingPattern::Char(a);
-                } else if a == DOT_CHAR && b == MANY_CHAR {
-                    return MatchingPattern::ManyRepeat;
-                } else if b == MANY_CHAR {
-                    return MatchingPattern::ManyChar(a);
-                }
-                return MatchingPattern::None;
-            }
-            (Some(a), None) => {
-                if a == MANY_CHAR {
-                    return MatchingPattern::ManyRepeat;
-                } else if a == DOT_CHAR {
-                    return MatchingPattern::Any;
-                }
-                return MatchingPattern::Char(a);
-            }
-            _ => {
-                return MatchingPattern::None;
-            }
-        }
-    }
-
-    fn increase_pattern_index_by_matching(&mut self, mp: MatchingPattern) {
-        match mp {
-            MatchingPattern::Char(_) | MatchingPattern::Any => {
-                self.pindex += 1;
-            }
-            MatchingPattern::ManyChar(_) | MatchingPattern::ManyRepeat => {
-                self.pindex += 2;
-            }
-            _ => {}
         }
     }
 
@@ -206,61 +165,22 @@ impl MyRegex {
         self.before_match();
 
         let chars = s.chars().collect::<Vec<char>>();
+        let mut i = 0;
 
         loop {
-            let mp = self.next_matching_pattern();
-            let s = chars.get(self.sindex).cloned();
-
-            if s.is_none() {
-                match mp {
-                    MatchingPattern::ManyChar(_) | MatchingPattern::ManyRepeat => {
-                        self.increase_pattern_index_by_matching(mp);
-                    }
-                    _ => {}
-                }
+            let pat = self.matching_patterns.get(i);
+            if pat.is_none() {
                 break;
             }
-
-            let s = s.unwrap();
-            let mut is_in_matching_repeat = false;
-            let mut matching_repeat_index: usize = 0;
-            let mut is_in_matching_many_char = false;
-            let mut matching_many_char_index: usize = 0;
-
-            match mp {
-                MatchingPattern::Any => {
-                    self.sindex += 1;
-                }
-                MatchingPattern::Char(c) => {
-                    if c == s {
-                        self.sindex += 1;
-                        self.increase_pattern_index_by_matching(mp);
-                    } else if is_in_matching_repeat {
-                        self.sindex += 1;
-                        // matching repeat to match multiple.
-                        self.pindex = matching_repeat_index;
-                        self.sindex = chars.len() - 1;
-                        self.increase_pattern_index_by_matching(MatchingPattern::ManyRepeat);
-                    } else {
-                        return false;
-                    }
-                }
-                MatchingPattern::ManyChar(c) => {
-                    if c == s {
-                        self.sindex += 1;
-                    } else {
-                        self.increase_pattern_index_by_matching(mp);
-                    }
+            let pat = pat.unwrap();
+            match pat {
+                MatchingPattern::Chars(parts) => {
+                    matching_chars(self, &chars, parts);
                 }
                 MatchingPattern::ManyRepeat => {
-                    matching_repeat_index = self.pindex;
-                    is_in_matching_repeat = true;
-                    self.increase_pattern_index_by_matching(mp);
+                    self.is_match_many = true;
                 }
-                _ => {
-                    // no pattern left
-                    break;
-                }
+                _ => {}
             }
         }
         // b*ba => bba
