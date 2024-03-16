@@ -62,9 +62,9 @@
  *
  *
  */
-#![allow(clippy::needless_return)]
+#![allow(clippy::needless_return, dead_code)]
 
-struct Solution;
+pub struct Solution;
 
 // @lc code=start
 
@@ -73,21 +73,24 @@ struct Solution;
 enum MatchingPattern {
     /// No pattern left
     None,
+    /// abc
     Chars(Vec<char>),
-    /// Match any char
+    /// single dot
     Any,
+    /// \[char\]\*
     ManyChar(char),
+    /// .*
     ManyRepeat,
 }
 
-const DOT_CHAR: char = '.';
-const MANY_CHAR: char = '*';
-
 #[derive(Debug)]
-struct MyRegex {
+pub struct MyRegex {
     pattern: Vec<char>,
     sindex: usize,
+    /// .*
     is_match_many: bool,
+    /// \[char\]\*
+    is_match_many_char: bool,
     matching_patterns: Vec<MatchingPattern>,
 }
 
@@ -96,6 +99,7 @@ impl MyRegex {
         MyRegex {
             pattern,
             sindex: 0,
+            is_match_many_char: false,
             is_match_many: false,
             matching_patterns: vec![],
         }
@@ -108,32 +112,46 @@ fn matching_chars(
     parts: &Vec<char>,
     sindex: &mut usize,
     is_in_matching_any: &mut bool,
-) {
+    is_in_matching_many_char: &mut bool,
+) -> bool {
     let parts_len = parts.len();
     let sindex_init = *sindex;
 
     loop {
-        let mirror = &chars[*sindex..=parts_len];
-        if mirror == parts {
-            *sindex += 1;
-        } else if *sindex != sindex_init {
-            *sindex = *sindex + parts_len;
-            // done
+        if chars.len() < (*sindex + parts_len) {
+            return false;
+        }
+        let mirror = &chars[*sindex..(*sindex + parts_len)];
+        if *is_in_matching_any {
+            if mirror == parts {
+                *sindex += 1;
+            } else {
+                *sindex += parts_len;
+            }
+        } else if *is_in_matching_many_char {
+            // (char)*
+            if mirror == parts {
+                *sindex += 1;
+            } else if sindex_init != *sindex {
+                *sindex += parts_len - 1;
+                *is_in_matching_many_char = false;
+                break;
+            } else {
+                // *abb, abb
+                // check the match one case
+                return false;
+            }
+        } else if mirror == parts {
+            *sindex += parts_len;
             break;
-        } else if *is_in_matching_any {
-            // start matching any
-            *sindex = *sindex + parts_len;
-            *is_in_matching_any = false;
-            break;
+        } else {
+            return false;
         }
     }
+    return true;
 }
 
 impl MyRegex {
-    fn is_special_char(&self, c: &char) -> bool {
-        *c == DOT_CHAR || *c == MANY_CHAR
-    }
-
     fn before_match(&mut self) {
         let mut i = 0;
         let mut group: Vec<char> = vec![];
@@ -186,6 +204,7 @@ impl MyRegex {
 
         let chars = s.chars().collect::<Vec<char>>();
         let mut i = 0;
+        let mut match_many_char_back = false;
 
         loop {
             let pat = self.matching_patterns.get(i);
@@ -195,21 +214,69 @@ impl MyRegex {
             let pat = pat.unwrap();
             match pat {
                 MatchingPattern::Chars(parts) => {
-                    matching_chars(&chars, parts, &mut self.sindex, &mut self.is_match_many);
+                    let has_match = matching_chars(
+                        &chars,
+                        parts,
+                        &mut self.sindex,
+                        &mut self.is_match_many,
+                        &mut self.is_match_many_char,
+                    );
+                    if !has_match {
+                        if self.sindex >= chars.len() {
+                            return true;
+                        }
+                        if self.is_match_many_char {
+                            i -= 1;
+                            match_many_char_back = true;
+                            continue;
+                        } else {
+                            return false;
+                        }
+                    }
+                    i += 1;
                 }
                 MatchingPattern::Any => {
-                    // dot*
+                    // dot
+                    self.sindex += 1;
+                    i += 1;
+                }
+                MatchingPattern::ManyChar(c) => {
+                    let next = self.matching_patterns.get(i + 1);
+                    if !match_many_char_back && matches!(next, Some(MatchingPattern::Chars(_))) {
+                        // match 0 first then match one char.
+                        self.is_match_many_char = true;
+                        i += 1;
+                    } else if chars.get(self.sindex) == Some(c) {
+                        // match one char.
+                        self.sindex += 1;
+                    } else {
+                        // match 0.
+                        self.is_match_many_char = false;
+                        match_many_char_back = false;
+                        i += 1;
+                    }
                 }
                 MatchingPattern::ManyRepeat => {
                     self.is_match_many = true;
+                    i += 1;
                 }
-                _ => {}
+                MatchingPattern::None => {}
             }
+        }
+
+        if self.is_match_many_char {
+            return false;
+        }
+        if self.is_match_many {
+            return true;
+        }
+        if self.sindex < chars.len() {
+            return false;
         }
         // b*ba => bba
         // (.*)(aaa)(b*)c(.*) => abaaaac
 
-        return false;
+        return true;
     }
 }
 
@@ -226,50 +293,41 @@ mod tests {
     use super::Solution;
     #[test]
     fn test_is_match_1() {
-        assert_eq!(Solution::is_match("abc".to_owned(), "a*".to_owned()), false);
+        assert!(!Solution::is_match("abc".to_owned(), "a*".to_owned()));
     }
     #[test]
     fn test_is_match_2() {
-        assert_eq!(Solution::is_match("abc".to_owned(), "a.*".to_owned()), true);
+        assert!(Solution::is_match("abc".to_owned(), "a.*".to_owned()));
     }
     #[test]
     fn test_is_match_3() {
-        assert_eq!(Solution::is_match("abc".to_owned(), ".*".to_owned()), true);
+        assert!(Solution::is_match("abc".to_owned(), ".*".to_owned()));
     }
     #[test]
     fn test_is_match_4() {
-        assert_eq!(Solution::is_match("aa".to_owned(), "a".to_owned()), false);
+        assert!(!Solution::is_match("aa".to_owned(), "a".to_owned()));
     }
     #[test]
     fn test_is_match_5() {
-        assert_eq!(Solution::is_match("aa".to_owned(), "aa".to_owned()), true);
+        assert!(Solution::is_match("aa".to_owned(), "aa".to_owned()));
     }
     #[test]
     fn test_is_match_6() {
-        assert_eq!(
-            Solution::is_match("aab".to_owned(), "c*a*b".to_owned()),
-            true
-        );
+        assert!(Solution::is_match("aab".to_owned(), "c*a*b".to_owned()));
     }
 
     #[test]
     fn test_is_match_7() {
-        assert_eq!(
-            Solution::is_match("aaa".to_owned(), "aaaa".to_owned()),
-            false
-        );
+        assert!(!Solution::is_match("aaa".to_owned(), "aaaa".to_owned()));
     }
 
     #[test]
     fn test_is_match_8() {
-        assert_eq!(Solution::is_match("aaa".to_owned(), "a*a".to_owned()), true);
+        assert!(Solution::is_match("aaa".to_owned(), "a*a".to_owned()));
     }
 
     #[test]
     fn test_is_match_9() {
-        assert_eq!(
-            Solution::is_match("aaa".to_owned(), "ab*ac*a".to_owned()),
-            true
-        );
+        assert!(Solution::is_match("aaa".to_owned(), "ab*ac*a".to_owned()));
     }
 }
