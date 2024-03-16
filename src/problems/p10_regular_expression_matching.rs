@@ -102,10 +102,30 @@ impl MyRegex {
     }
 }
 
-fn matching_chars(host: &MyRegex, chars: &Vec<char>, parts: &Vec<char>) {
+// use free function because of interprocedure conflict problem.
+fn matching_chars(
+    chars: &Vec<char>,
+    parts: &Vec<char>,
+    sindex: &mut usize,
+    is_in_matching_any: &mut bool,
+) {
     let parts_len = parts.len();
+    let sindex_init = *sindex;
+
     loop {
-        let mirror = &chars[host.sindex..parts_len];
+        let mirror = &chars[*sindex..=parts_len];
+        if mirror == parts {
+            *sindex += 1;
+        } else if *sindex != sindex_init {
+            *sindex = *sindex + parts_len;
+            // done
+            break;
+        } else if *is_in_matching_any {
+            // start matching any
+            *sindex = *sindex + parts_len;
+            *is_in_matching_any = false;
+            break;
+        }
     }
 }
 
@@ -175,7 +195,10 @@ impl MyRegex {
             let pat = pat.unwrap();
             match pat {
                 MatchingPattern::Chars(parts) => {
-                    matching_chars(self, &chars, parts);
+                    matching_chars(&chars, parts, &mut self.sindex, &mut self.is_match_many);
+                }
+                MatchingPattern::Any => {
+                    // dot*
                 }
                 MatchingPattern::ManyRepeat => {
                     self.is_match_many = true;
