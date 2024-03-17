@@ -121,11 +121,22 @@ impl RegexCursor {
         };
     }
     /// get range from string.
-    fn sindex_range(&self, end: usize) -> std::ops::Range<usize> {
+    fn sindex_range(&self, size: usize) -> Option<std::ops::Range<usize>> {
+        if self.forward_sindex <= self.backward_sindex {
+            return None;
+        }
         return if self.is_forward {
-            self.forward_sindex..end
+            let end = self.forward_sindex + size;
+            if end > self.backward_sindex - 1 {
+                return None;
+            }
+            Some(self.forward_sindex..end)
         } else {
-            end..self.backward_sindex
+            let end = self.backward_sindex - size;
+            if end < self.forward_sindex + 1 {
+                return None;
+            }
+            Some(end..self.backward_sindex)
         };
     }
     fn get_pindex(&self) -> usize {
@@ -195,7 +206,7 @@ fn matching_chars(
             } else {
                 // TODO: fixme
                 // should support backend match.
-                // aba|c|a, .*|c|b*|a
+                // abca|cb|b|a, .*|cb|b*|b|a
                 *sindex += parts_len;
             }
         } else if *is_in_matching_many_char {
@@ -273,12 +284,29 @@ impl MyRegex {
         return self.matching_patterns.get(self.cursor.get_pindex());
     }
 
+    fn match_sub_string(cursor: &mut RegexCursor, strings: &Vec<char>, parts: &Vec<char>) -> bool {
+        loop {
+            let parts_len = parts.len();
+            let Some(range) = cursor.sindex_range(parts_len) else {
+                return false;
+            };
+            let end = range.end;
+            let mirror = &strings[range];
+            if mirror == parts {
+                cursor.inc_sindex();
+            } else if cursor.is_match_more_any && end < parts_len {
+                cursor.inc_sindex();
+            }
+            if end >= parts_len || !cursor.is_match_more_any {
+                break;
+            }
+        }
+    }
+
     fn is_match(&mut self) -> bool {
         self.before_match();
 
         let chars = self.strings;
-        let mut i = self.cursor.get_pindex();
-        let mut match_many_char_back = false;
 
         loop {
             let pat = self.get_next_pattern_item();
@@ -287,52 +315,33 @@ impl MyRegex {
             }
             let pat = pat.unwrap();
             match pat {
-                MatchingPattern::Chars(parts) => {
-                    let mirror = &self.strings[self.cursor.sindex_range(parts.len())];
-                    if mirror == parts {
-                        self.cursor.inc_sindex();
-                        self.cursor.inc_pindex();
-                    } else {
-                        return false;
-                    }
-                }
+                MatchingPattern::Chars(parts) => {}
                 MatchingPattern::SingleAny => {
                     // dot
                     self.cursor.inc_sindex();
                     self.cursor.inc_pindex();
                 }
                 MatchingPattern::MoreChar(c) => {
-                    let next = self.matching_patterns.get(i + 1);
-                    if !match_many_char_back && matches!(next, Some(MatchingPattern::Chars(_))) {
-                        // match 0 first then match one char.
-                        self.is_match_many_char = true;
-                        i += 1;
-                    } else if chars.get(self.sindex) == Some(c) {
-                        // match one char.
-                        self.sindex += 1;
-                    } else {
-                        // match 0.
-                        self.is_match_many_char = false;
-                        match_many_char_back = false;
-                        i += 1;
+                    if self.cursor.is_match_more_char {
+                        // start match more char.
+                        continue;
                     }
+                    self.cursor.is_match_more_char = true;
+                    // self.cursor.inc_pindex();
+                    self.cursor.toggle_forward();
                 }
                 MatchingPattern::MoreAny => {
+                    if self.cursor.is_match_more_any {
+                        self.cursor.inc_pindex();
+                        // start match more any.
+                        continue;
+                    }
                     self.cursor.toggle_forward();
+                    // self.cursor.inc_pindex();
                     self.cursor.is_match_more_any = true;
                 }
                 MatchingPattern::None => {}
             }
-        }
-
-        if self.is_match_many_char {
-            return false;
-        }
-        if self.is_match_many {
-            return true;
-        }
-        if self.sindex < chars.len() {
-            return false;
         }
         // b*ba => bba
         // (.*)(aaa)(b*)c(.*) => abaaaac
