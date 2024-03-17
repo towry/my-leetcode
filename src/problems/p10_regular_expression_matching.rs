@@ -76,32 +76,99 @@ enum MatchingPattern {
     /// abc
     Chars(Vec<char>),
     /// single dot
-    Any,
+    SingleAny,
     /// \[char\]\*
-    ManyChar(char),
+    MoreChar(char),
     /// .*
-    ManyRepeat,
+    MoreAny,
 }
 
 #[derive(Debug)]
 pub struct MyRegex {
+    /// The pattern string to be matched.
     pattern: Vec<char>,
-    sindex: usize,
-    /// .*
-    is_match_many: bool,
-    /// \[char\]\*
-    is_match_many_char: bool,
+    /// The string to be tested.
+    strings: Vec<char>,
+    /// The pattern splitted in group.
     matching_patterns: Vec<MatchingPattern>,
+    /// mutable cursor.
+    cursor: RegexCursor,
+}
+
+#[derive(Debug)]
+struct RegexCursor {
+    is_forward: bool,
+    /// string index forward
+    forward_sindex: usize,
+    /// string index backward
+    backward_sindex: usize,
+    /// pattern index forward
+    forward_pindex: usize,
+    /// pattern index backward
+    backward_pindex: usize,
+    /// `.*`
+    is_match_more_any: bool,
+    /// `char*`
+    is_match_more_char: bool,
+}
+
+impl RegexCursor {
+    fn get_sindex(&self) -> usize {
+        return if self.is_forward {
+            self.forward_sindex
+        } else {
+            self.backward_sindex
+        };
+    }
+    /// get range from string.
+    fn sindex_range(&self, end: usize) -> std::ops::Range<usize> {
+        return if self.is_forward {
+            self.forward_sindex..end
+        } else {
+            end..self.backward_sindex
+        };
+    }
+    fn get_pindex(&self) -> usize {
+        return if self.is_forward {
+            self.forward_pindex
+        } else {
+            self.backward_pindex
+        };
+    }
+    fn toggle_forward(&mut self) {
+        self.is_forward = !self.is_forward;
+    }
+    fn inc_sindex(&mut self) {
+        if self.is_forward {
+            self.forward_sindex += 1;
+        } else {
+            self.backward_sindex -= 1;
+        }
+    }
+    fn inc_pindex(&mut self) {
+        if self.is_forward {
+            self.forward_pindex += 1;
+        } else {
+            self.backward_pindex -= 1;
+        }
+    }
 }
 
 impl MyRegex {
-    fn new(pattern: Vec<char>) -> Self {
+    fn new(pattern: Vec<char>, strings: Vec<char>) -> Self {
         MyRegex {
             pattern,
-            sindex: 0,
-            is_match_many_char: false,
-            is_match_many: false,
+            strings,
             matching_patterns: vec![],
+            cursor: RegexCursor {
+                is_forward: true,
+                forward_sindex: 0,
+                backward_sindex: strings.len() - 1,
+                forward_pindex: 0,
+                backward_pindex: 0,
+                is_match_more_any: false,
+                is_match_more_char: false,
+            },
         }
     }
 }
@@ -172,7 +239,7 @@ impl MyRegex {
             if *s == '*' {
                 if pre_char == '.' {
                     self.matching_patterns.pop();
-                    self.matching_patterns.push(MatchingPattern::ManyRepeat);
+                    self.matching_patterns.push(MatchingPattern::MoreAny);
                 } else if pre_char != ' ' {
                     group.pop();
                     if !group.is_empty() {
@@ -180,7 +247,7 @@ impl MyRegex {
                         group = vec![];
                     }
                     self.matching_patterns
-                        .push(MatchingPattern::ManyChar(pre_char));
+                        .push(MatchingPattern::MoreChar(pre_char));
                 }
                 continue;
             } else if *s == '.' {
@@ -189,7 +256,7 @@ impl MyRegex {
                     self.matching_patterns.push(MatchingPattern::Chars(group));
                     group = vec![];
                 }
-                self.matching_patterns.push(MatchingPattern::Any);
+                self.matching_patterns.push(MatchingPattern::SingleAny);
                 continue;
             }
 
@@ -202,48 +269,39 @@ impl MyRegex {
         }
     }
 
-    fn is_match(&mut self, s: String) -> bool {
+    fn get_next_pattern_item(&self) -> Option<&MatchingPattern> {
+        return self.matching_patterns.get(self.cursor.get_pindex());
+    }
+
+    fn is_match(&mut self) -> bool {
         self.before_match();
 
-        let chars = s.chars().collect::<Vec<char>>();
-        let mut i = 0;
+        let chars = self.strings;
+        let mut i = self.cursor.get_pindex();
         let mut match_many_char_back = false;
 
         loop {
-            let pat = self.matching_patterns.get(i);
+            let pat = self.get_next_pattern_item();
             if pat.is_none() {
                 break;
             }
             let pat = pat.unwrap();
             match pat {
                 MatchingPattern::Chars(parts) => {
-                    let has_match = matching_chars(
-                        &chars,
-                        parts,
-                        &mut self.sindex,
-                        &mut self.is_match_many,
-                        &mut self.is_match_many_char,
-                    );
-                    if !has_match {
-                        if self.sindex >= chars.len() {
-                            return true;
-                        }
-                        if self.is_match_many_char {
-                            i -= 1;
-                            match_many_char_back = true;
-                            continue;
-                        } else {
-                            return false;
-                        }
+                    let mirror = &self.strings[self.cursor.sindex_range(parts.len())];
+                    if mirror == parts {
+                        self.cursor.inc_sindex();
+                        self.cursor.inc_pindex();
+                    } else {
+                        return false;
                     }
-                    i += 1;
                 }
-                MatchingPattern::Any => {
+                MatchingPattern::SingleAny => {
                     // dot
-                    self.sindex += 1;
-                    i += 1;
+                    self.cursor.inc_sindex();
+                    self.cursor.inc_pindex();
                 }
-                MatchingPattern::ManyChar(c) => {
+                MatchingPattern::MoreChar(c) => {
                     let next = self.matching_patterns.get(i + 1);
                     if !match_many_char_back && matches!(next, Some(MatchingPattern::Chars(_))) {
                         // match 0 first then match one char.
@@ -259,16 +317,9 @@ impl MyRegex {
                         i += 1;
                     }
                 }
-                MatchingPattern::ManyRepeat => {
-                    let next = self.matching_patterns.get(i + 1);
-                    if next.is_some() {
-                        self.is_match_many = true;
-                        i += 1;
-                    } else {
-                        self.is_match_many = false;
-                        i += 1;
-                        self.sindex += chars.len();
-                    }
+                MatchingPattern::MoreAny => {
+                    self.cursor.toggle_forward();
+                    self.cursor.is_match_more_any = true;
                 }
                 MatchingPattern::None => {}
             }
@@ -292,8 +343,11 @@ impl MyRegex {
 
 impl Solution {
     pub fn is_match(s: String, p: String) -> bool {
-        let mut reg = MyRegex::new(p.chars().collect::<Vec<char>>());
-        reg.is_match(s)
+        let mut reg = MyRegex::new(
+            p.chars().collect::<Vec<char>>(),
+            s.chars().collect::<Vec<char>>(),
+        );
+        reg.is_match()
     }
 }
 // @lc code=end

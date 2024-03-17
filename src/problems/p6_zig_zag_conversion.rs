@@ -88,6 +88,7 @@
 7
 */
 #![deny(arithmetic_overflow)]
+#![allow(dead_code)]
 
 pub struct Solution;
 
