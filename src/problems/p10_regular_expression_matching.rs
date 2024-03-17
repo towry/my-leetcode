@@ -64,7 +64,7 @@
  */
 #![allow(clippy::needless_return, dead_code)]
 
-pub struct Solution;
+struct Solution;
 
 // @lc code=start
 
@@ -126,6 +126,9 @@ fn matching_chars(
             if mirror == parts {
                 *sindex += 1;
             } else {
+                // TODO: fixme
+                // should support backend match.
+                // aba|c|a, .*|c|b*|a
                 *sindex += parts_len;
             }
         } else if *is_in_matching_many_char {
@@ -257,8 +260,15 @@ impl MyRegex {
                     }
                 }
                 MatchingPattern::ManyRepeat => {
-                    self.is_match_many = true;
-                    i += 1;
+                    let next = self.matching_patterns.get(i + 1);
+                    if next.is_some() {
+                        self.is_match_many = true;
+                        i += 1;
+                    } else {
+                        self.is_match_many = false;
+                        i += 1;
+                        self.sindex += chars.len();
+                    }
                 }
                 MatchingPattern::None => {}
             }
@@ -329,5 +339,10 @@ mod tests {
     #[test]
     fn test_is_match_9() {
         assert!(Solution::is_match("aaa".to_owned(), "ab*ac*a".to_owned()));
+    }
+
+    #[test]
+    fn test_is_match_10() {
+        assert!(!Solution::is_match("ab".to_owned(), ".*c".to_owned()))
     }
 }
