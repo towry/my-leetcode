@@ -172,6 +172,7 @@ impl RegexCursor {
 
 impl MyRegex {
     fn new(pattern: Vec<char>, strings: Vec<char>) -> Self {
+        let backward_sindex = strings.len() - 1;
         MyRegex {
             pattern,
             strings,
@@ -179,7 +180,7 @@ impl MyRegex {
             cursor: RegexCursor {
                 is_forward: true,
                 forward_sindex: 0,
-                backward_sindex: strings.len() - 1,
+                backward_sindex,
                 forward_pindex: 0,
                 backward_pindex: 0,
                 is_match_more_any: false,
@@ -187,54 +188,6 @@ impl MyRegex {
             },
         }
     }
-}
-
-// use free function because of interprocedure conflict problem.
-fn matching_chars(
-    chars: &Vec<char>,
-    parts: &Vec<char>,
-    sindex: &mut usize,
-    is_in_matching_any: &mut bool,
-    is_in_matching_many_char: &mut bool,
-) -> bool {
-    let parts_len = parts.len();
-    let sindex_init = *sindex;
-
-    loop {
-        if chars.len() < (*sindex + parts_len) {
-            return false;
-        }
-        let mirror = &chars[*sindex..(*sindex + parts_len)];
-        if *is_in_matching_any {
-            if mirror == parts {
-                *sindex += 1;
-            } else {
-                // TODO: fixme
-                // should support backend match.
-                // abca|cb|b|a, .*|cb|b*|b|a
-                *sindex += parts_len;
-            }
-        } else if *is_in_matching_many_char {
-            // (char)*
-            if mirror == parts {
-                *sindex += 1;
-            } else if sindex_init != *sindex {
-                *sindex += parts_len - 1;
-                *is_in_matching_many_char = false;
-                break;
-            } else {
-                // *abb, abb
-                // check the match one case
-                return false;
-            }
-        } else if mirror == parts {
-            *sindex += parts_len;
-            break;
-        } else {
-            return false;
-        }
-    }
-    return true;
 }
 
 impl MyRegex {
@@ -320,7 +273,9 @@ impl MyRegex {
                     self.cursor.inc_pindex();
                 }
                 MatchingPattern::MoreChar(c) => {
+                    let e = c.clone();
                     if self.cursor.is_match_more_char {
+                        self.cursor.is_match_more_char = false;
                         self.cursor.toggle_forward();
                         // start match more char.
                         loop {
@@ -330,7 +285,7 @@ impl MyRegex {
                                 break;
                             };
                             let mirror = &strings[range];
-                            if &mirror[0] == c {
+                            if &mirror[0] == &e {
                                 self.cursor.inc_sindex();
                             } else {
                                 // match char ends.
