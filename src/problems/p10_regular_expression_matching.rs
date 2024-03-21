@@ -113,6 +113,19 @@ struct RegexCursor {
 }
 
 impl RegexCursor {
+    /// For strings index:
+    /// forward index meets backward index
+    fn sindex_meets(&self) -> bool {
+        return self.forward_sindex == self.backward_sindex;
+    }
+    /// For pattern groups index:
+    /// forward index meets backward index
+    fn pindex_meets(&self) -> bool {
+        return self.forward_pindex == self.backward_pindex;
+    }
+    fn index_meets(&self) -> bool {
+        return self.sindex_meets() && self.pindex_meets();
+    }
     fn get_sindex(&self) -> usize {
         return if self.is_forward {
             self.forward_sindex
@@ -236,9 +249,13 @@ impl MyRegex {
         if !group.is_empty() {
             self.matching_patterns.push(MatchingPattern::Chars(group));
         }
+        self.cursor.backward_pindex = self.matching_patterns.len() - 1;
     }
 
     fn get_next_pattern_item(&self) -> Option<&MatchingPattern> {
+        if self.cursor.forward_pindex > self.cursor.backward_pindex {
+            return None;
+        }
         return self.matching_patterns.get(self.cursor.get_pindex());
     }
 
@@ -274,9 +291,11 @@ impl MyRegex {
                 }
                 MatchingPattern::MoreChar(c) => {
                     let e = c.clone();
-                    if self.cursor.is_match_more_char {
+                    if self.cursor.is_match_more_char || self.cursor.pindex_meets() {
+                        if self.cursor.is_match_more_char {
+                            self.cursor.toggle_forward();
+                        }
                         self.cursor.is_match_more_char = false;
-                        self.cursor.toggle_forward();
                         // start match more char.
                         loop {
                             let Some(range) = self.cursor.sindex_range(1) else {
@@ -299,9 +318,12 @@ impl MyRegex {
                     self.cursor.toggle_forward();
                 }
                 MatchingPattern::MoreAny => {
-                    if self.cursor.is_match_more_any {
+                    if self.cursor.is_match_more_any || self.cursor.pindex_meets() {
                         // fish.
-                        self.cursor.toggle_forward();
+                        if self.cursor.is_match_more_any {
+                            // reset
+                            self.cursor.toggle_forward();
+                        }
                         self.cursor.inc_pindex();
                         self.cursor
                             .move_sindex(self.cursor.backward_sindex - self.cursor.forward_sindex);
@@ -314,8 +336,16 @@ impl MyRegex {
                 MatchingPattern::None => {}
             }
         }
+
+        println!("{:?}", self.cursor);
+
         // b*ba => bba
         // (.*)(aaa)(b*)c(.*) => abaaaac
+        if !self.cursor.index_meets() {
+            return false;
+        }
+
+        // TODO: test 3 fail
 
         return true;
     }
@@ -337,11 +367,12 @@ mod tests {
     use super::Solution;
     #[test]
     fn test_is_match_1() {
-        assert!(!Solution::is_match("abc".to_owned(), "a*".to_owned()));
+        // i preffer assert_eq
+        assert_eq!(Solution::is_match("abc".to_owned(), "a*".to_owned()), false);
     }
     #[test]
     fn test_is_match_2() {
-        assert!(Solution::is_match("abc".to_owned(), "a.*".to_owned()));
+        assert_eq!(Solution::is_match("abc".to_owned(), "a.*".to_owned()), true);
     }
     #[test]
     fn test_is_match_3() {
