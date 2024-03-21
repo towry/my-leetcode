@@ -263,8 +263,14 @@ impl MyRegex {
         self.before_match();
 
         let strings = &self.strings;
+        let mut loop_count = 0;
 
         loop {
+            loop_count += 1;
+            if loop_count >= 50 {
+                println!("{:?}", self.cursor);
+                return false;
+            }
             let pat = self.get_next_pattern_item();
             if pat.is_none() {
                 break;
@@ -282,7 +288,8 @@ impl MyRegex {
                         self.cursor.inc_pindex();
                         continue;
                     }
-                    return false;
+                    println!("{:?}, {:?}", parts, mirror);
+                    continue;
                 }
                 MatchingPattern::SingleAny => {
                     // dot
@@ -408,5 +415,13 @@ mod tests {
     #[test]
     fn test_is_match_10() {
         assert!(!Solution::is_match("ab".to_owned(), ".*c".to_owned()))
+    }
+
+    #[test]
+    fn test_is_match_11() {
+        assert_eq!(
+            Solution::is_match("mississippi".to_owned(), "mis*is*ip*.".to_owned()),
+            true
+        );
     }
 }
