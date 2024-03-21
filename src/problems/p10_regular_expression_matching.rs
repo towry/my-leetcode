@@ -116,14 +116,14 @@ impl RegexCursor {
     /// For strings index:
     /// forward index meets backward index
     fn sindex_meets(&self) -> bool {
-        return self.forward_sindex == self.backward_sindex;
+        return self.forward_sindex == self.backward_sindex + 1;
     }
     /// For pattern groups index:
     /// forward index meets backward index
     fn pindex_meets(&self) -> bool {
-        return self.forward_pindex == self.backward_pindex;
+        return self.forward_pindex == self.backward_pindex + 1;
     }
-    fn index_meets(&self) -> bool {
+    fn index_exhuasted(&self) -> bool {
         return self.sindex_meets() && self.pindex_meets();
     }
     fn get_sindex(&self) -> usize {
@@ -291,10 +291,8 @@ impl MyRegex {
                 }
                 MatchingPattern::MoreChar(c) => {
                     let e = c.clone();
-                    if self.cursor.is_match_more_char || self.cursor.pindex_meets() {
-                        if self.cursor.is_match_more_char {
-                            self.cursor.toggle_forward();
-                        }
+                    if self.cursor.is_match_more_char {
+                        self.cursor.toggle_forward();
                         self.cursor.is_match_more_char = false;
                         // start match more char.
                         loop {
@@ -309,6 +307,7 @@ impl MyRegex {
                             } else {
                                 // match char ends.
                                 self.cursor.inc_pindex();
+                                // break this inner loop
                                 break;
                             }
                         }
@@ -318,15 +317,14 @@ impl MyRegex {
                     self.cursor.toggle_forward();
                 }
                 MatchingPattern::MoreAny => {
-                    if self.cursor.is_match_more_any || self.cursor.pindex_meets() {
+                    if self.cursor.is_match_more_any {
                         // fish.
-                        if self.cursor.is_match_more_any {
-                            // reset
-                            self.cursor.toggle_forward();
-                        }
+                        // reset
+                        self.cursor.toggle_forward();
                         self.cursor.inc_pindex();
-                        self.cursor
-                            .move_sindex(self.cursor.backward_sindex - self.cursor.forward_sindex);
+                        self.cursor.move_sindex(
+                            self.cursor.backward_sindex + 1 - self.cursor.forward_sindex,
+                        );
                         // start match more any.
                         continue;
                     }
@@ -336,16 +334,17 @@ impl MyRegex {
                 MatchingPattern::None => {}
             }
         }
-
         println!("{:?}", self.cursor);
 
         // b*ba => bba
         // (.*)(aaa)(b*)c(.*) => abaaaac
-        if !self.cursor.index_meets() {
+        if !self.cursor.index_exhuasted() {
             return false;
         }
 
         // TODO: test 3 fail
+
+        println!("{:?}", self.cursor);
 
         return true;
     }
